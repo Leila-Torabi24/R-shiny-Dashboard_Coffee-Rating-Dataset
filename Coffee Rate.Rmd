@@ -1,0 +1,175 @@
+---
+title: "Data Analysis of Coffee Dataset"
+author: "Leila Torabi"
+date: "2024-07-05"
+output: html_document
+---
+
+
+
+```{r}
+library(tidyverse)
+coffee_ratings <- readr::read_csv('https://raw.githubusercontent.com/rfordatascience/tidytuesday/master/data/2020/2020-07-07/coffee_ratings.csv')
+coffee_ratings
+```
+
+```{r}
+
+coffee_ratings %>% 
+  ggplot(aes(x=total_cup_points))+
+  geom_histogram()+
+  scale_x_log10()
+
+```
+
+
+
+```{r}
+# The difference between Company, owner and farm_name
+# One owner can have more than one farm_name and company
+coffee_ratings %>% 
+  select(owner, farm_name , company) %>% 
+  drop_na() %>% 
+  count(owner, company , sort = TRUE) %>% 
+  arrange(owner)
+
+
+# One company can have more than one farm_name and owner
+coffee_ratings %>% 
+  select(owner, farm_name , company) %>% 
+  drop_na() %>% 
+  count(company, owner , sort = TRUE) %>% 
+  arrange(company)
+
+
+```
+```{r}
+# verify that we selected the correct features for point analysis
+coffee_ratings %>% 
+  select(country_of_origin, total_cup_points, aroma:cupper_points) %>% 
+  mutate(row_num=row_number()) %>% 
+  gather(key="key", value="value", -country_of_origin, -total_cup_points,-row_num) %>% 
+  group_by(row_num) %>% 
+  summarise(value=sum(value),
+            mean_total_cup_points=mean(total_cup_points)) 
+```
+
+
+```{r}
+coffee_ratings %>% 
+  filter(country_of_origin=="Ethiopia") %>% 
+  select(aroma:cupper_points) %>% 
+  gather() %>% 
+  group_by( key) %>% 
+  mutate(value=mean(value)) %>% 
+  ungroup() %>% 
+  mutate(key= str_replace(key,"_", " ")) %>% 
+  mutate(key= str_to_title(key)) %>% 
+  mutate(key=fct_reorder(key,value)) %>% 
+  ggplot(aes(x=key , y=value , color=key))+
+  geom_point(size=5)+
+  geom_segment(aes(x=key, xend=key, y=value, yend=0 ))+
+  coord_flip()+
+  theme(legend.position = "none")+
+  xlab("")+
+  ylab("")+
+  labs(title="Avg Flavour Profile")
+```
+
+
+
+```{r}
+# Bean Variety
+coffee_ratings %>% 
+  filter(country_of_origin=="Ethiopia") %>% 
+  select(variety) %>% 
+  drop_na() %>% 
+  count(variety) %>% 
+  mutate(variety=fct_reorder(variety,n)) %>% 
+  ggplot(aes(x=variety, y=n, fill=variety))+
+  geom_col()+
+  ylab("")+
+  xlab("")+
+  labs(title="Bean Variety")+
+  theme(legend.position = "none")+
+  coord_flip()
+```
+
+
+
+```{r}
+# Table for total cup points for different specious in different countries and regions
+# install.packages("kableExtra")
+library(kableExtra)
+coffee_ratings %>%
+  filter(country_of_origin=="Ethiopia") %>% 
+  select( species, total_cup_points, region) %>% 
+  drop_na() %>% 
+  mutate (region=str_trunc(region,12, "right")) %>% 
+  group_by( species , region) %>% 
+  top_n(total_cup_points, n=1) %>% 
+  ungroup() %>% 
+  arrange(desc(total_cup_points)) %>% 
+  kable()
+```
+
+
+
+```{r}
+# Comparing Ethiopian coffee with coffee from other countries
+# how different are the flavor profiles?
+library(broom)
+coffee_ratings %>%
+  select(country_of_origin, aroma:cupper_points) %>% 
+  mutate(highlight=if_else(country_of_origin=="Ethiopia", "Highlight","Non-Highlight" )) %>% 
+  select(-country_of_origin) %>% 
+  gather(key="key", value="value", -highlight) %>% 
+  group_by( key) %>% 
+  do(t_test=t.test(value~highlight, data=.) %>% tidy()) %>% 
+  unnest() %>% 
+  mutate(key=str_replace(key, "_", " ")) %>% 
+  mutate(key=str_to_title(key)) %>% 
+  mutate(key=fct_reorder(key, estimate)) %>% 
+  mutate(difference=case_when(
+    conf.low<0 & conf.high<0 ~ "Different",
+    conf.low>0 & conf.high>0 ~ "Different",
+    TRUE ~ "Not-different"
+  )) %>% 
+  ggplot(aes(x=key, y=estimate))+
+  geom_point()+
+  geom_pointrange(aes(ymin=conf.low, ymax=conf.high, color=difference))+
+  xlab("")+
+  ylab("")+
+  labs(title = "how different are the flavor profiles?")+
+  theme(legend.position = "none")+
+  coord_flip()+
+  geom_hline(yintercept = 0, linetype="dashed") 
+  
+```
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
